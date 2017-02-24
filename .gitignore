@@ -1,1 +1,3 @@
 test/export_data
+node_modules
+.idea
