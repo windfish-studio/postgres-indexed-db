@@ -14,16 +14,24 @@ tape("should export all database data to specified directory", function (t) {
         db: {
             database: "dvdrental_sample"
         },
+        output_path: "test/export_data",
         results_per_page: 100
     });
 
     observable.subscribe(function(msg_o){
-        if(msg_o.message == "finished"){
-            t.end();
-            console.log('finished');
-        }else if(msg_o.message == "table_finished"){
-            console.log('\''+msg_o.value+'\' write finished...');
+        switch(msg_o.message){
+            case "finished":
+                t.end();
+                console.log('finished');
+                break;
+            case "table_finished":
+                console.log('\''+msg_o.value+'\' write finished...');
+                break;
+            case "progress":
+                console.log("%"+(msg_o.value*100).toFixed(2)+" done...");
+                break;
         }
+
     });
 });
 
