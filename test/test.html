@@ -1,0 +1,22 @@
+<html>
+    <head>
+        <script type="text/javascript" src="../dist/postgres-indexed-db.js"></script>
+        <script type="text/javascript">
+            var tape = require('tape');
+
+            //Assemble data path
+            var path_ar = window.location.pathname.split("/");
+            path_ar.pop();
+
+            var data_path = window.location.origin + path_ar.join("/") + "/export_data";
+
+
+            tape("should export all database data to specified directory", function(t){
+                window.PGIndexedDBImporter( data_path, 'test_db' );
+
+                t.end();
+            });
+
+        </script>
+    </head>
+</html>

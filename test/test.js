@@ -6,7 +6,7 @@
 
 var _ = require('lodash');
 var pg = require('pg');
-var exporter = require('../lib/index.js').exporter;
+var exporter = require('../lib/index.js');
 var tape = require('tape');
 var fs = require('fs');
 var path = require('path');
@@ -35,10 +35,10 @@ tape("should export all database data to specified directory", function (t) {
                     var manifest = require(path.join(__dirname, 'export_data', '_manifest.json'));
 
                     //get tables data from database
-                    pool.query("SELECT table_name, table_schema FROM information_schema.tables", []).then(function(result){
+                    pool.query("SELECT table_name, table_schema, table_type FROM information_schema.tables", []).then(function(result){
                         var db_tables = [];
                         _.each(result.rows, function(row){
-                            if(row.table_schema == 'public'){
+                            if(row.table_schema == 'public' && row.table_type == 'BASE TABLE'){
                                 db_tables.push(row.table_name);
                                 t.equal(typeof manifest[row.table_name], 'object'); //manifest entry should exist for each table
                             }
@@ -47,7 +47,6 @@ tape("should export all database data to specified directory", function (t) {
                         t.equals(output_filenames.length - 1, db_tables.length); //minus one for manifest
 
                         _.each(db_tables, function(table_name){
-
                             var output_ar = require(path.join(__dirname, 'export_data', table_name+'.json'));
                             t.equal(manifest[table_name].row_count, output_ar.length);
                         });
