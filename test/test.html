@@ -12,8 +12,7 @@
 
 
             tape("should export all database data to specified directory", function(t){
-                window.PGIndexedDBImporter( data_path, 'test_db' );
-
+                var events = window.PGIndexedDBImporter( data_path, 'test_db' );
                 t.end();
             });
 
