@@ -1,8 +1,22 @@
 <html>
     <head>
+        <style type="text/css">
+            div.log {
+                display: block;
+                font-family: monospace;
+                white-space: pre;
+            }
+        </style>
         <script type="text/javascript" src="../dist/postgres-indexed-db.js"></script>
         <script type="text/javascript">
             var tape = require('tape');
+
+            console.log = function(value){
+                var el = document.createElement("div");
+                el.className = "log";
+                el.innerText = value;
+                window.document.body.appendChild(el);
+            };
 
             //Assemble data path
             var path_ar = window.location.pathname.split("/");
