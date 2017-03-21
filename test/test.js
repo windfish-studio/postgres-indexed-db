@@ -23,10 +23,14 @@ var conf = {
 var export_promise = do_export();
 var db_schema_promise = get_db_schema();
 
-var db_schema;
+var db_schema, export_messages;
 
 db_schema_promise.then(function (result) {
     db_schema = result.rows;
+});
+
+export_promise.then(function (messages) {
+    export_messages = messages;
 });
 
 q.all([export_promise, db_schema_promise]).then(function () {
@@ -35,8 +39,8 @@ q.all([export_promise, db_schema_promise]).then(function () {
     var manifest = require(path.join(__dirname, 'export_data', '_manifest.json'));
 
     tape("should export all database data in JSON format", function (t) {
-        //get tables data from database
 
+        //get tables data from database
         var db_tables = [];
         _.each(db_schema, function (row) {
             if (row.table_schema == 'public' && row.table_type == 'BASE TABLE') {
@@ -52,8 +56,73 @@ q.all([export_promise, db_schema_promise]).then(function () {
             t.equal(manifest[table_name].row_count, output_ar.length);
         });
 
+        var pool = new pg.Pool(conf.db);
+        pool.connect(function (err, client, done) {
+
+            var query_promises = [];
+            _.each(db_tables, function (table_name) {
+                var query_def = q.defer();
+                query_promises.push(query_def.promise)
+                var output_ar = require(path.join(__dirname, 'export_data', table_name + '.json'));
+                t.equal(manifest[table_name].row_count, output_ar.length);
+                var random_item = output_ar[parseInt(Math.random()*1000) % manifest[table_name].row_count];
+
+                var where_ar = [];
+                _.each(manifest[table_name].primary_keys, function (pk_name) {
+                    where_ar.push([pk_name, random_item[pk_name]].join(' = '));
+                });
+
+                pool.query("SELECT * FROM " + table_name + " WHERE " + where_ar.join(' AND '), []).then(function (result) {
+                    var row = result.rows[0];
+                    _.each(row, function (value, key) {
+                        var _exp_v = random_item[key]
+                        var _db_v = value;
+
+                        if(value instanceof Date){
+                            //some simple conversions for postgresql dates to javascript dates.
+                            var psql_date = random_item[key];
+                            if(psql_date.length == 10)
+                                psql_date += ' 00:00:00';
+                            var _d = new Date(psql_date.replace('T', ' '));
+
+                            _exp_v = _d.getTime();
+                            _db_v = value.getTime();
+                        }
+
+                        if(value instanceof Uint8Array){
+                            //such a pain in the ass to test...
+                            return;
+                        }
+
+                        t.ok(_exp_v == _db_v);
+                    });
+                    query_def.resolve();
+                });
+            });
+
+            q.all(query_promises).then(function () {
+                done();
+                pool.end().then(function () {
+                    t.end();
+                });
+            });
+        });
+    });
+
+    tape("should emit progress messages", function (t) {
+        var message_names = _.map(export_messages, function (msg_o) {
+            return msg_o.message;
+        });
+
+        t.ok(message_names.length > 0);
+        t.ok(message_names[message_names.length - 1] == 'finished');
+        t.ok(message_names.indexOf('progress') >= 0);
+        t.ok(message_names.indexOf('table_finished') >= 0);
+
         t.end();
     });
+
+
 });
 
 function get_db_schema () {
@@ -75,12 +144,14 @@ function do_export () {
     var observable = exporter(conf);
 
     var def = q.defer();
+    var messages = [];
 
     observable.subscribe(function(msg_o){
+        messages.push(msg_o);
         switch(msg_o.message){
             case "finished":
                 console.log('finished');
-                def.resolve();
+                def.resolve(messages);
                 break;
             case "progress":
                 console.log("%"+(msg_o.value*100).toFixed(2)+" done...");
