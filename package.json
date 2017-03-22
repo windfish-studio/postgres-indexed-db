@@ -1,8 +1,7 @@
 {
   "name": "postgres-indexed-db",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "lib/index.js",
-
   "dependencies": {
     "lodash": "latest",
     "q": "1.4.1",
@@ -15,21 +14,18 @@
     "oboe": "2.1.3",
     "tape": "latest"
   },
-
   "clientDependencies": [
     "lodash",
     "oboe",
     "q",
     "tape"
   ],
-
   "devDependencies": {
     "browserify": "13.1.0",
     "browserify-row-flow": "0.1.0",
     "watchify": "3.7.0",
     "scssify": "2.1.0",
     "babelify": "7.3.0",
-
     "gulp": "3.9.1",
     "gulp-tap": "0.1.3",
     "gulp-util": "3.0.7",
