@@ -116,6 +116,16 @@
                         });
                     };
                 });
+
+                tape("should emit progress events", function(t){
+                    var message_names = _.map(messages, function(msg_o){
+                        return msg_o.message;
+                    });
+
+                    t.ok(message_names.indexOf('progress') >= 0, "emits progress events");
+                    t.ok(message_names.indexOf('success') >= 0, "emits success event");
+                    t.end();
+                });
             });
 
         </script>
