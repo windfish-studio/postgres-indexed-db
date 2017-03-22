@@ -10,6 +10,9 @@
         <script type="text/javascript" src="../dist/postgres-indexed-db.js"></script>
         <script type="text/javascript">
             var tape = require('tape');
+            var q = require('q');
+            var _ = require('lodash');
+            var oboe = require('oboe');
 
             console.log = function(value){
                 var el = document.createElement("div");
@@ -24,10 +27,95 @@
 
             var data_path = window.location.origin + path_ar.join("/") + "/export_data";
 
+            var events = window.PGIndexedDBImporter( data_path, 'test_db' );
+            var messages = [];
+            var import_def = q.defer();
+            var manifest;
 
-            tape("should export all database data to specified directory", function(t){
-                var events = window.PGIndexedDBImporter( data_path, 'test_db' );
-                t.end();
+            events.subscribe(function (msg_o) {
+                messages.push(msg_o);
+                switch (msg_o.message){
+                    case "success":
+                        import_def.resolve();
+                        console.log('finished');
+                        break;
+                    case "progress":
+                        console.log((msg_o.value * 100).toFixed(2) + '% done...');
+                        break;
+                    case "manifest":
+                        manifest = msg_o.value;
+                        break;
+                }
+            });
+
+            import_def.promise.then(function () {
+                tape("should import all data to IndexedDB from data_path", function(t){
+                    var open = indexedDB.open('test_db', 1);
+                    open.onsuccess = function(event) {
+                        var db = event.target.result;
+                        var table_promises = [];
+
+                        _.each(manifest, function (_m, table_name) {
+
+                            var table_def = q.defer();
+                            table_promises.push(table_def.promise);
+
+                            oboe(data_path + '/' + table_name + '.json').done(function (_d) {
+                                var tx = db.transaction([table_name], "readwrite");
+                                var store = tx.objectStore(table_name);
+
+                                var index;
+                                if(_m.primary_keys.length > 1){
+                                    index = store.index("idx_multiple_pkeys");
+                                }
+
+                                var count_def = q.defer();
+                                var count_request = store.count();
+                                count_request.onsuccess = function() {
+                                    t.equal(count_request.result, _m.row_count, table_name + " manifest.row_count matches idb count");
+
+                                    count_def.resolve(count_request.result);
+                                };
+
+                                //pick 3 random datums
+                                _.each(new Array(3), function () {
+                                    var random_idx = parseInt(Math.random() * 1000000) % _d.length;
+                                    var source_datum = _d[random_idx];
+
+                                    var pkeys = [];
+                                    _.each(_m.primary_keys, function (pkey_name) {
+                                        pkeys.push(source_datum[pkey_name]);
+                                    });
+
+                                    var idb_def = q.defer();
+
+                                    var idb_result;
+                                    if(_m.primary_keys.length > 1){
+                                        idb_result = index.get(pkeys);
+                                    }else{
+                                        idb_result = store.get(source_datum[_m.primary_keys[0]]);
+                                    }
+
+                                    idb_result.onsuccess = function () {
+                                        var idb_datum = idb_result.result;
+                                        _.each(idb_datum, function (_v, _k) {
+                                            t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
+                                        });
+
+                                        idb_def.resolve();
+                                    };
+
+                                    q.all([count_def.promise, idb_def.promise]).then(table_def.resolve);
+                                });
+                            });
+                        });
+
+                        q.all(table_promises).then(function () {
+                            db.close();
+                            t.end();
+                        });
+                    };
+                });
             });
 
         </script>

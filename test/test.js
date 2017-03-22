@@ -115,7 +115,7 @@ q.all([export_promise, db_schema_promise]).then(function () {
         });
 
         t.ok(message_names.length > 0);
-        t.ok(message_names[message_names.length - 1] == 'finished');
+        t.ok(message_names[message_names.length - 1] == 'success');
         t.ok(message_names.indexOf('progress') >= 0);
         t.ok(message_names.indexOf('table_finished') >= 0);
 
@@ -149,7 +149,7 @@ function do_export () {
     observable.subscribe(function(msg_o){
         messages.push(msg_o);
         switch(msg_o.message){
-            case "finished":
+            case "success":
                 console.log('finished');
                 def.resolve(messages);
                 break;
