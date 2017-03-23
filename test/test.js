@@ -16,7 +16,7 @@ var conf = {
     db: {
         database: "dvdrental_sample"
     },
-    output_path: "test/export_data",
+    output_path: path.join(__dirname, '..', 'test/export_data'),
     results_per_page: 100
 };
 
