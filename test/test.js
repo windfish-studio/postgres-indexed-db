@@ -6,7 +6,7 @@
 
 var _ = require('lodash');
 var pg = require('pg');
-var exporter = require('../lib/index.js');
+var exporter = require('../lib/index.js').exporter;
 var tape = require('tape');
 var fs = require('fs');
 var q = require('q');

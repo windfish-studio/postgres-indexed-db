@@ -6,17 +6,15 @@ IndexedDB. Makes use of streams to handle I/O for databases larger than availabl
 
 ## Usage
 
-Note, the package will export either the exporter or the importer depending on
-the environment. E.g. if you're in a browser, require('postgres-indexed-db') will return the
-importer, as well as assign it to window.PGIndexedDBImporter. 
-
 Both importer and exporter will return RxJS Observable objects, which will emit useful progress
 messages.
 
+Note: exporter will be unavailable in non-node.js environments and importer will be unavailable in
+non-browser environments.
 
 ### Export (Node.js Only)
 ```js
-    var exporter = require('postgres-indexed-db');
+    var exporter = require('postgres-indexed-db').exporter;
     
     //exporter config.db is fed into pg.Pool https://www.npmjs.com/package/pg
     var observable = exporter({
@@ -44,7 +42,7 @@ messages.
 ### Import (Browser Only)
 ```js
     //Import 
-    var importer = require('postgres-indexed-db');
+    var importer = require('postgres-indexed-db').importer;
     
     //path to data from exporter as 1st param, IndexedDB name as 2nd
     var observable = importer( "test/exported_data", 'test_db' );

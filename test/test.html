@@ -27,7 +27,7 @@
 
             var data_path = window.location.origin + path_ar.join("/") + "/export_data";
 
-            var events = window.PGIndexedDBImporter( data_path, 'test_db' );
+            var events = window.PGIndexedDB.importer( data_path, 'test_db' );
             var messages = [];
             var import_def = q.defer();
             var manifest;
