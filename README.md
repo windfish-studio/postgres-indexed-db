@@ -14,7 +14,7 @@ non-browser environments.
 
 ### Export (Node.js Only)
 ```js
-    var exporter = require('postgres-indexed-db').exporter;
+    var exporter = require('postgres-indexed-db').Exporter;
     
     //exporter config.db is fed into pg.Pool https://www.npmjs.com/package/pg
     var observable = exporter({
@@ -42,10 +42,10 @@ non-browser environments.
 ### Import (Browser Only)
 ```js
     //Import 
-    var importer = require('postgres-indexed-db').importer;
+    var Importer = require('postgres-indexed-db').Importer;
     
     //path to data from exporter as 1st param, IndexedDB name as 2nd
-    var observable = importer( "test/exported_data", 'test_db' );
+    var observable = Importer.import( "test/exported_data", 'test_db' );
     
     observable.subscribe(function(msg_o){
         switch (msg_o.message){
@@ -63,6 +63,10 @@ non-browser environments.
         }
     });
     
+    //idbImported can be used to query whether a database has been successfully imported.
+    //uses localStorage, can be used to avoid a re-import when undesirable
+    Importer.idbImported('test_db'); //returns true
+
 ```
 
 ## Running The Tests
