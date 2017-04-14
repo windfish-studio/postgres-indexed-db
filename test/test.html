@@ -27,10 +27,11 @@
 
             var data_path = window.location.origin + path_ar.join("/") + "/export_data";
 
-            var events = window.PGIndexedDB.importer( data_path, 'test_db' );
+            var events = window.PGIndexedDB.Importer.import( data_path, 'test_db' );
             var messages = [];
             var import_def = q.defer();
             var manifest;
+            var localstorage_state;
 
             events.subscribe(function (msg_o) {
                 messages.push(msg_o);
@@ -45,8 +46,13 @@
                     case "manifest":
                         manifest = msg_o.value;
                         break;
+                    case "old_idb_deleted":
+                        localstorage_state = window.PGIndexedDB.Importer.idbImported('test_db');
+                        break;
                 }
             });
+
+            window.PGIndexedDB.Importer.idbImported('test_db');
 
             import_def.promise.then(function () {
                 tape("should import all data to IndexedDB from data_path", function(t){
@@ -124,6 +130,13 @@
 
                     t.ok(message_names.indexOf('progress') >= 0, "emits progress events");
                     t.ok(message_names.indexOf('success') >= 0, "emits success event");
+                    t.end();
+                });
+
+
+                tape("should save idb name in localstorage as finished", function(t){
+                    t.ok(!localstorage_state, 'correctly deleted from finished idbs list when data is still processing');
+                    t.ok(window.PGIndexedDB.Importer.idbImported('test_db'));
                     t.end();
                 });
             });
