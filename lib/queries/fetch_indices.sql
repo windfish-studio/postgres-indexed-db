@@ -1,19 +1,23 @@
-select
-    t.relname as table_name,
-    i.relname as index_name,
-    a.attname as column_name
-from
+SELECT
+    t.relname AS table_name,
+    i.relname AS index_name,
+    a.attname AS column_name,
+    tc.constraint_type AS idx_type
+FROM
     pg_class t,
-    pg_class i,
+    pg_class i
+      LEFT OUTER JOIN information_schema.table_constraints tc ON i.relname = tc.constraint_name,
     pg_index ix,
     pg_attribute a
-where
+
+WHERE
     t.oid = ix.indrelid
-    and i.oid = ix.indexrelid
-    and a.attrelid = t.oid
-    and a.attnum = ANY(ix.indkey)
-    and t.relkind = 'r'
-    and t.relname NOT LIKE 'pg_%'
-order by
+    AND i.oid = ix.indexrelid
+    AND a.attrelid = t.oid
+    AND a.attnum = ANY(ix.indkey)
+    AND t.relkind = 'r'
+    AND t.relname NOT LIKE 'pg_%'
+    AND (tc.table_name = t.relname OR tc.constraint_type IS NULL)
+ORDER BY
     t.relname,
     i.relname;
