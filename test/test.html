@@ -12,7 +12,7 @@
             var tape = require('tape');
             var q = require('q');
             var _ = require('lodash');
-            var oboe = require('oboe');
+            var ndjsonStream = require('can-ndjson-stream');
 
             console.log = function(value){
                 var el = document.createElement("div");
@@ -66,54 +66,71 @@
                             var table_def = q.defer();
                             table_promises.push(table_def.promise);
 
-                            oboe(data_path + '/' + table_name + '.json').done(function (_d) {
-                                var tx = db.transaction([table_name], "readwrite");
-                                var store = tx.objectStore(table_name);
+                            fetch(data_path + '/' + table_name + '.ndjson')
+                                .then(function (response) {
+                                    return ndjsonStream(response.body);
+                                }).then(function (dataStream) {
+                                    var reader = dataStream.getReader();
+                                    var all_data = [];
+                                    var readDatum = function (result) {
+                                        if(result.done){
+                                            var tx = db.transaction([table_name], "readwrite");
+                                            var store = tx.objectStore(table_name);
 
-                                var index;
-                                if(_m.primary_keys.length > 1){
-                                    index = store.index("idx_multiple_pkeys");
-                                }
+                                            var index;
+                                            if(_m.primary_keys.length > 1){
+                                                index = store.index("idx_multiple_pkeys");
+                                            }
 
-                                var count_def = q.defer();
-                                var count_request = store.count();
-                                count_request.onsuccess = function() {
-                                    t.equal(count_request.result, _m.row_count, table_name + " manifest.row_count matches idb count");
+                                            var count_def = q.defer();
+                                            var count_request = store.count();
+                                            count_request.onsuccess = function() {
+                                                t.equal(count_request.result, _m.row_count, table_name + " manifest.row_count matches idb count");
 
-                                    count_def.resolve(count_request.result);
-                                };
+                                                count_def.resolve(count_request.result);
+                                            };
 
-                                //pick 3 random datums
-                                _.each(new Array(3), function () {
-                                    var random_idx = parseInt(Math.random() * 1000000) % _d.length;
-                                    var source_datum = _d[random_idx];
+//pick 3 random datums
+                                            _.each(new Array(3), function () {
+                                                var random_idx = parseInt(Math.random() * 1000000) % all_data.length;
+                                                var source_datum = all_data[random_idx];
 
-                                    var pkeys = [];
-                                    _.each(_m.primary_keys, function (pkey_name) {
-                                        pkeys.push(source_datum[pkey_name]);
-                                    });
+                                                var pkeys = [];
+                                                _.each(_m.primary_keys, function (pkey_name) {
+                                                    pkeys.push(source_datum[pkey_name]);
+                                                });
 
-                                    var idb_def = q.defer();
+                                                var idb_def = q.defer();
 
-                                    var idb_result;
-                                    if(_m.primary_keys.length > 1){
-                                        idb_result = index.get(pkeys);
-                                    }else{
-                                        idb_result = store.get(source_datum[_m.primary_keys[0]]);
-                                    }
+                                                var idb_result;
+                                                if(_m.primary_keys.length > 1){
+                                                    idb_result = index.get(pkeys);
+                                                }else{
+                                                    idb_result = store.get(source_datum[_m.primary_keys[0]]);
+                                                }
 
-                                    idb_result.onsuccess = function () {
-                                        var idb_datum = idb_result.result;
-                                        _.each(idb_datum, function (_v, _k) {
-                                            t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
-                                        });
+                                                idb_result.onsuccess = function () {
+                                                    var idb_datum = idb_result.result;
+                                                    _.each(idb_datum, function (_v, _k) {
+                                                        t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
+                                                    });
 
-                                        idb_def.resolve();
+                                                    idb_def.resolve();
+                                                };
+
+                                                q.all([count_def.promise, idb_def.promise]).then(table_def.resolve);
+                                            });
+
+                                            return;
+                                        }
+
+                                        all_data.push(result.value);
+
+                                        reader.read().then(readDatum);
                                     };
 
-                                    q.all([count_def.promise, idb_def.promise]).then(table_def.resolve);
+                                    reader.read().then(readDatum);
                                 });
-                            });
                         });
 
                         q.all(table_promises).then(function () {

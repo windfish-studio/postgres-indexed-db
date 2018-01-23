@@ -11,6 +11,7 @@ var tape = require('tape');
 var fs = require('fs');
 var q = require('q');
 var path = require('path');
+var ndjson = require('ndjson');
 
 var conf = {
     db: {
@@ -51,59 +52,79 @@ q.all([export_promise, db_schema_promise]).then(function () {
 
         t.equals(output_filenames.length - 1, db_tables.length); //minus one for manifest
 
+        var output_ars = {};
+        var output_ps = [];
         _.each(db_tables, function (table_name) {
-            var output_ar = require(path.join(__dirname, 'export_data', table_name + '.json'));
-            t.equal(manifest[table_name].row_count, output_ar.length);
-        });
+            var output_def = q.defer();
+            output_ps.push(output_def.promise);
 
-        var pool = new pg.Pool(conf.db);
-        pool.connect(function (err, client, done) {
+            var outputStream = ndjson.parse();
+            fs.createReadStream(path.join(__dirname, 'export_data', table_name + '.ndjson')).pipe(outputStream);
 
-            var query_promises = [];
-            _.each(db_tables, function (table_name) {
-                var query_def = q.defer();
-                query_promises.push(query_def.promise)
-                var output_ar = require(path.join(__dirname, 'export_data', table_name + '.json'));
-                t.equal(manifest[table_name].row_count, output_ar.length);
-                var random_item = output_ar[parseInt(Math.random()*1000) % manifest[table_name].row_count];
+            output_ars[table_name] = [];
 
-                var where_ar = [];
-                _.each(manifest[table_name].primary_keys, function (pk_name) {
-                    where_ar.push([pk_name, random_item[pk_name]].join(' = '));
-                });
-
-                pool.query("SELECT * FROM " + table_name + " WHERE " + where_ar.join(' AND '), []).then(function (result) {
-                    var row = result.rows[0];
-                    _.each(row, function (value, key) {
-                        var _exp_v = random_item[key]
-                        var _db_v = value;
-
-                        if(value instanceof Date){
-                            //some simple conversions for postgresql dates to javascript dates.
-                            var psql_date = random_item[key];
-                            if(psql_date.length == 10)
-                                psql_date += ' 00:00:00';
-                            var _d = new Date(psql_date.replace('T', ' '));
-
-                            _exp_v = _d.getTime();
-                            _db_v = value.getTime();
-                        }
-
-                        if(value instanceof Uint8Array){
-                            //such a pain in the ass to test...
-                            return;
-                        }
-
-                        t.ok(_exp_v == _db_v);
-                    });
-                    query_def.resolve();
-                });
+            outputStream.on('data', function (datum) {
+                output_ars[table_name].push(datum);
             });
 
-            q.all(query_promises).then(function () {
-                done();
-                pool.end().then(function () {
-                    t.end();
+            outputStream.on('end', function () {
+                t.equal(manifest[table_name].row_count, output_ars[table_name].length);
+                output_def.resolve();
+            });
+        });
+
+        q.all(output_ps).then(function () {
+            var pool = new pg.Pool(conf.db);
+            pool.connect(function (err, client, done) {
+
+                var query_promises = [];
+                _.each(db_tables, function (table_name) {
+
+                    var output_ar = output_ars[table_name];
+                    var query_def = q.defer();
+                    query_promises.push(query_def.promise)
+
+                    t.equal(manifest[table_name].row_count, output_ar.length);
+                    var random_item = output_ar[parseInt(Math.random()*1000) % manifest[table_name].row_count];
+
+                    var where_ar = [];
+                    _.each(manifest[table_name].primary_keys, function (pk_name) {
+                        where_ar.push([pk_name, random_item[pk_name]].join(' = '));
+                    });
+
+                    pool.query("SELECT * FROM " + table_name + " WHERE " + where_ar.join(' AND '), []).then(function (result) {
+                        var row = result.rows[0];
+                        _.each(row, function (value, key) {
+                            var _exp_v = random_item[key]
+                            var _db_v = value;
+
+                            if(value instanceof Date){
+                                //some simple conversions for postgresql dates to javascript dates.
+                                var psql_date = random_item[key];
+                                if(psql_date.length == 10)
+                                    psql_date += ' 00:00:00';
+                                var _d = new Date(psql_date.replace('T', ' '));
+
+                                _exp_v = _d.getTime();
+                                _db_v = value.getTime();
+                            }
+
+                            if(value instanceof Uint8Array){
+                                //such a pain in the ass to test...
+                                return;
+                            }
+
+                            t.ok(_exp_v == _db_v);
+                        });
+                        query_def.resolve();
+                    });
+                });
+
+                q.all(query_promises).then(function () {
+                    done();
+                    pool.end().then(function () {
+                        t.end();
+                    });
                 });
             });
         });
