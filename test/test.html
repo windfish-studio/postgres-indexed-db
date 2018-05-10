@@ -26,35 +26,54 @@
             path_ar.pop();
 
             var data_path = window.location.origin + path_ar.join("/") + "/export_data";
+            var idb_name = 'test_db';
 
-            var events = window.PGIndexedDB.Importer.import( data_path, 'test_db' );
+            var del_def = q.defer();
+            var del_request = window.indexedDB.deleteDatabase(idb_name);
+
+            del_request.onblocked = function(){
+                console.log('database delete blocked');
+                del_def.reject('blocked');
+            };
+
+            del_request.onsuccess = function () {
+                del_def.resolve();
+            };
+
+            del_request.onerror = function () {
+                del_def.resolve();
+            };
+
+            var manifest;
             var messages = [];
             var import_def = q.defer();
-            var manifest;
-            var localstorage_state;
 
-            events.subscribe(function (msg_o) {
-                messages.push(msg_o);
-                switch (msg_o.message){
-                    case "success":
-                        import_def.resolve();
-                        console.log('finished');
-                        break;
-                    case "progress":
-                        console.log((msg_o.value * 100).toFixed(2) + '% done...');
-                        break;
-                    case "manifest":
-                        manifest = msg_o.value;
-                        break;
-                    case "old_idb_deleted":
-                        localstorage_state = window.PGIndexedDB.Importer.idbImported('test_db');
-                        break;
-                }
+            del_def.promise.then(function () {
+                var events = window.PGIndexedDB.Importer.import( data_path, function (migrate) {
+                    var open_request = window.indexedDB.open(idb_name, 1);
+                    open_request.onupgradeneeded = migrate;
+                    open_request.onerror = import_def.reject;
+                });
+
+                events.subscribe(function (msg_o) {
+                    messages.push(msg_o);
+                    switch (msg_o.message){
+                        case "success":
+                            import_def.resolve();
+                            console.log('finished');
+                            break;
+                        case "progress":
+                            console.log((msg_o.value * 100).toFixed(2) + '% done...');
+                            break;
+                        case "manifest":
+                            manifest = msg_o.value;
+                            break;
+                    }
+                });
             });
 
-            window.PGIndexedDB.Importer.idbImported('test_db');
-
             import_def.promise.then(function () {
+
                 tape("should import all data to IndexedDB from data_path", function(t){
                     var open = indexedDB.open('test_db', 1);
                     open.onsuccess = function(event) {
@@ -70,67 +89,67 @@
                                 .then(function (response) {
                                     return ndjsonStream(response.body);
                                 }).then(function (dataStream) {
-                                    var reader = dataStream.getReader();
-                                    var all_data = [];
-                                    var readDatum = function (result) {
-                                        if(result.done){
-                                            var tx = db.transaction([table_name], "readwrite");
-                                            var store = tx.objectStore(table_name);
+                                var reader = dataStream.getReader();
+                                var all_data = [];
+                                var readDatum = function (result) {
+                                    if(result.done){
+                                        var tx = db.transaction([table_name], "readwrite");
+                                        var store = tx.objectStore(table_name);
 
-                                            var index;
-                                            if(_m.primary_keys.length > 1){
-                                                index = store.index("idx_multiple_pkeys");
-                                            }
-
-                                            var count_def = q.defer();
-                                            var count_request = store.count();
-                                            count_request.onsuccess = function() {
-                                                t.equal(count_request.result, _m.row_count, table_name + " manifest.row_count matches idb count");
-
-                                                count_def.resolve(count_request.result);
-                                            };
-
-//pick 3 random datums
-                                            _.each(new Array(3), function () {
-                                                var random_idx = parseInt(Math.random() * 1000000) % all_data.length;
-                                                var source_datum = all_data[random_idx];
-
-                                                var pkeys = [];
-                                                _.each(_m.primary_keys, function (pkey_name) {
-                                                    pkeys.push(source_datum[pkey_name]);
-                                                });
-
-                                                var idb_def = q.defer();
-
-                                                var idb_result;
-                                                if(_m.primary_keys.length > 1){
-                                                    idb_result = index.get(pkeys);
-                                                }else{
-                                                    idb_result = store.get(source_datum[_m.primary_keys[0]]);
-                                                }
-
-                                                idb_result.onsuccess = function () {
-                                                    var idb_datum = idb_result.result;
-                                                    _.each(idb_datum, function (_v, _k) {
-                                                        t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
-                                                    });
-
-                                                    idb_def.resolve();
-                                                };
-
-                                                q.all([count_def.promise, idb_def.promise]).then(table_def.resolve);
-                                            });
-
-                                            return;
+                                        var index;
+                                        if(_m.primary_keys.length > 1){
+                                            index = store.index("idx_multiple_pkeys");
                                         }
 
-                                        all_data.push(result.value);
+                                        var count_def = q.defer();
+                                        var count_request = store.count();
+                                        count_request.onsuccess = function() {
+                                            t.equal(count_request.result, _m.row_count, table_name + " manifest.row_count matches idb count");
 
-                                        reader.read().then(readDatum);
-                                    };
+                                            count_def.resolve(count_request.result);
+                                        };
+
+                                        //pick 3 random datums
+                                        _.each(new Array(3), function () {
+                                            var random_idx = parseInt(Math.random() * 1000000) % all_data.length;
+                                            var source_datum = all_data[random_idx];
+
+                                            var pkeys = [];
+                                            _.each(_m.primary_keys, function (pkey_name) {
+                                                pkeys.push(source_datum[pkey_name]);
+                                            });
+
+                                            var idb_def = q.defer();
+
+                                            var idb_result;
+                                            if(_m.primary_keys.length > 1){
+                                                idb_result = index.get(pkeys);
+                                            }else{
+                                                idb_result = store.get(source_datum[_m.primary_keys[0]]);
+                                            }
+
+                                            idb_result.onsuccess = function () {
+                                                var idb_datum = idb_result.result;
+                                                _.each(idb_datum, function (_v, _k) {
+                                                    t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
+                                                });
+
+                                                idb_def.resolve();
+                                            };
+
+                                            q.all([count_def.promise, idb_def.promise]).then(table_def.resolve);
+                                        });
+
+                                        return;
+                                    }
+
+                                    all_data.push(result.value);
 
                                     reader.read().then(readDatum);
-                                });
+                                };
+
+                                reader.read().then(readDatum);
+                            });
                         });
 
                         q.all(table_promises).then(function () {
@@ -149,15 +168,7 @@
                     t.ok(message_names.indexOf('success') >= 0, "emits success event");
                     t.end();
                 });
-
-
-                tape("should save idb name in localstorage as finished", function(t){
-                    t.ok(!localstorage_state, 'correctly deleted from finished idbs list when data is still processing');
-                    t.ok(window.PGIndexedDB.Importer.idbImported('test_db'));
-                    t.end();
-                });
             });
-
         </script>
     </head>
 </html>
