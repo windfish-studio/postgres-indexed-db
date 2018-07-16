@@ -92,7 +92,7 @@ q.all([export_promise, db_schema_promise]).then(function () {
                         where_ar.push([pk_name, random_item[pk_name]].join(' = '));
                     });
 
-                    pool.query("SELECT * FROM " + table_name + " WHERE " + where_ar.join(' AND '), []).then(function (result) {
+                    client.query("SELECT * FROM " + table_name + " WHERE " + where_ar.join(' AND '), []).then(function (result) {
                         var row = result.rows[0];
                         _.each(row, function (value, key) {
                             var _exp_v = random_item[key]
@@ -100,18 +100,25 @@ q.all([export_promise, db_schema_promise]).then(function () {
 
                             if(value instanceof Date){
                                 //some simple conversions for postgresql dates to javascript dates.
-                                var psql_date = random_item[key];
-                                if(psql_date.length == 10)
-                                    psql_date += ' 00:00:00';
-                                var _d = new Date(psql_date.replace('T', ' '));
+                                var output_date = random_item[key];
+                                if(output_date.length == 10)
+                                    output_date += ' 00:00:00';
+                                var _d = new Date(output_date.replace('T', ' '));
 
                                 _exp_v = _d.getTime();
                                 _db_v = value.getTime();
                             }
 
                             if(value instanceof Uint8Array){
-                                //such a pain in the ass to test...
-                                return;
+                                var _hex = "\\x";
+                                value.forEach(function (_uint8) {
+                                    var append = _uint8.toString(16).toUpperCase();
+                                    if(append.length == 1)
+                                        append = "0"+ append;
+                                    _hex += append;
+                                });
+
+                                _db_v = _hex.toLowerCase();
                             }
 
                             t.ok(_exp_v == _db_v);
