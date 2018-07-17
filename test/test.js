@@ -44,10 +44,10 @@ q.all([export_promise, db_schema_promise]).then(function () {
         //get tables data from database
         var db_tables = [];
         _.each(db_schema, function (row) {
-            if (row.table_schema == 'public' && row.table_type == 'BASE TABLE') {
-                db_tables.push(row.table_name);
-                t.equal(typeof manifest[row.table_name], 'object'); //manifest entry should exist for each table
-            }
+            var qualified_name = [row.table_schema, row.table_name].join('.');
+            db_tables.push(qualified_name);
+            t.equal(typeof manifest[qualified_name], 'object'); //manifest entry should exist for each table
+
         });
 
         t.equals(output_filenames.length - 1, db_tables.length); //minus one for manifest
@@ -157,7 +157,11 @@ function get_db_schema () {
     var def = q.defer();
     var pool = new pg.Pool(conf.db);
     pool.connect(function (err, client, done) {
-        pool.query("SELECT table_name, table_schema, table_type FROM information_schema.tables", []).then(function (result) {
+        client.query(`
+            SELECT table_name, table_schema, table_type 
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+        `, []).then(function (result) {
             def.resolve(result);
             done();
             pool.end();

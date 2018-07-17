@@ -2,9 +2,11 @@ SELECT
     t.relname AS table_name,
     i.relname AS index_name,
     a.attname AS column_name,
-    tc.constraint_type AS idx_type
+    tc.constraint_type AS idx_type,
+    ts.table_schema AS table_schema
 FROM
-    pg_class t,
+    pg_class t
+        LEFT OUTER JOIN information_schema.tables ts ON t.relname = ts.table_name,
     pg_class i
       LEFT OUTER JOIN information_schema.table_constraints tc ON i.relname = tc.constraint_name,
     pg_index ix,
