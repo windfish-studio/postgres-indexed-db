@@ -18,7 +18,7 @@
     "can-ndjson-stream": "0.1.7",
     "ndjson": "1.5.0",
     "tape": "latest",
-    "moment": "^2.22.2"
+    "moment-mini": "^2.22.1"
   },
   "clientDependencies": [
     "lodash",
@@ -26,7 +26,7 @@
     "ndjson",
     "q",
     "tape",
-    "moment"
+    "moment-mini"
   ],
   "devDependencies": {
     "browserify": "13.1.0",
