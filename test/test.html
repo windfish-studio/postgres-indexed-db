@@ -131,20 +131,26 @@
                                             idb_result.onsuccess = function () {
                                                 var idb_datum = idb_result.result;
                                                 _.each(idb_datum, function (_v, _k) {
-                                                    if(typeof source_datum[_k] == 'string' && source_datum[_k].substring(0, 2) == "\\x"){
-                                                        //convert the _v from an ArrayBuffer to a hex string
+                                                    var _datatype = _m.columns[_k];
+                                                    switch(_datatype){
+                                                        case 'bytea':
+                                                            if(_v == null)
+                                                                break;
 
-                                                        t.ok(_v instanceof ArrayBuffer, "Postgres bytea values should be imported as type ArrayBuffer");
-                                                        var output = "\\x";
-                                                        var uint8View = new Uint8Array(_v);
-                                                        uint8View.forEach(function (_uint8) {
-                                                            var append = _uint8.toString(16).toUpperCase();
-                                                            if(append.length == 1)
-                                                                append = "0"+ append;
-                                                            output += append;
-                                                        });
-                                                        _v = output;
+                                                            //convert the _v from an ArrayBuffer to a hex string
+                                                            t.ok(_v instanceof ArrayBuffer, "Postgres bytea values should be imported as type ArrayBuffer");
+                                                            var output = "\\x";
+                                                            var uint8View = new Uint8Array(_v);
+                                                            uint8View.forEach(function (_uint8) {
+                                                                var append = _uint8.toString(16);
+                                                                if(append.length == 1)
+                                                                    append = "0"+ append;
+                                                                output += append;
+                                                            });
+                                                            _v = output;
+                                                            break;
                                                     }
+
 
                                                     t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
 
