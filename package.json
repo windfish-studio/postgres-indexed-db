@@ -17,14 +17,16 @@
     "rxjs": "5.0.0-beta.12",
     "can-ndjson-stream": "0.1.7",
     "ndjson": "1.5.0",
-    "tape": "latest"
+    "tape": "latest",
+    "moment": "^2.22.2"
   },
   "clientDependencies": [
     "lodash",
     "can-ndjson-stream",
     "ndjson",
     "q",
-    "tape"
+    "tape",
+    "moment"
   ],
   "devDependencies": {
     "browserify": "13.1.0",

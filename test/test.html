@@ -12,6 +12,7 @@
             var tape = require('tape');
             var q = require('q');
             var _ = require('lodash');
+            var moment = require('moment');
             var ndjsonStream = require('can-ndjson-stream');
 
             console.log = function(value){
@@ -133,6 +134,12 @@
                                                 _.each(idb_datum, function (_v, _k) {
                                                     var _datatype = _m.columns[_k];
                                                     switch(_datatype){
+                                                        case 'date':
+                                                        case 'timestamp with timezone':
+                                                        case 'timestamp without timezone':
+                                                            var _s = moment(source_datum[_k]);
+                                                            t.ok(_s.isSame(moment(_v)), "assert idb date/timestamp data is equal to source");
+                                                            break;
                                                         case 'bytea':
                                                             if(_v == null)
                                                                 break;
@@ -148,11 +155,12 @@
                                                                 output += append;
                                                             });
                                                             _v = output;
+                                                            t.equal(_v, source_datum[_k], "assert idb bytea data is equal to source");
+                                                            break;
+                                                        default:
+                                                            t.equal(_v, source_datum[_k], "assert idb data is equal to source");
                                                             break;
                                                     }
-
-
-                                                    t.equal(_v, source_datum[_k], "assert " + table_name + "_" + source_datum[_m.primary_keys[0]] + " idb data is equal to source");
 
                                                 });
 
