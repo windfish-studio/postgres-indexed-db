@@ -1,10 +1,10 @@
 {
-  "name": "postgres-indexed-db",
+  "name": "@windfish-studio/postgres-indexed-db",
   "version": "0.3.1",
   "main": "lib/index.js",
   "repository": {
     "type": "git",
-    "url": "git://github.com/sikanrong/postgres-indexed-db.git"
+    "url": "https://github.com/windfish-studio/postgres-indexed-db.git"
   },
   "dependencies": {
     "lodash": "latest",
